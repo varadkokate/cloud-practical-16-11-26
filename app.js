@@ -1,75 +1,52 @@
-const activeCount = document.getElementById("active-count");
-const workersEl = document.getElementById("workers");
-const notice = document.getElementById("notice");
-const up = document.getElementById("up");
-const down = document.getElementById("down");
+async function fetchStatus() {
+    try {
+        const response = await fetch('/api/status');
+        
+        // Safety check to ensure server returned JSON and not an HTML fallback
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            throw new Error("Server returned non-JSON response.");
+        }
 
-async function request(url, options = {}) {
-  const response = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    ...options
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Request failed");
-  return data;
+        const data = await response.json();
+        document.getElementById('instance-count').textContent = data.instances;
+        document.getElementById('system-status').textContent = data.status;
+        document.getElementById('system-load').textContent = data.load;
+    } catch (err) {
+        console.error('Failed to fetch status:', err);
+    }
 }
 
-async function refresh() {
-  try {
-    const data = await request("/api/status");
-    activeCount.textContent = data.activeInstances;
-    workersEl.innerHTML = "";
-    data.workers.forEach(worker => {
-      const card = document.createElement("div");
-      card.className = "worker";
-      const symbol = document.createElement("div");
-      symbol.className = "symbol";
-      symbol.textContent = "▣";
-      const title = document.createElement("b");
-      title.textContent = `Instance ${worker.id}`;
-      const detail = document.createElement("small");
-      detail.textContent = `${worker.status} · port ${worker.port}`;
-      card.append(symbol, title, detail);
-      workersEl.appendChild(card);
-    });
-    up.disabled = data.activeInstances >= data.maxInstances;
-    down.disabled = data.activeInstances <= 1;
-    notice.textContent = `Controller is healthy. ${data.activeInstances} worker instance(s) currently active.`;
-  } catch (error) {
-    notice.textContent = error.message;
-  }
-}
-
-up.addEventListener("click", async () => {
-  try {
-    const data = await request("/api/scale-up", { method: "POST" });
-    notice.textContent = data.message;
-    await new Promise(resolve => setTimeout(resolve, 250));
-    await refresh();
-  } catch (error) { notice.textContent = error.message; }
+document.getElementById('provision-btn').addEventListener('click', async () => {
+    try {
+        const response = await fetch('/api/provision', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        document.getElementById('output').textContent = data.message;
+        fetchStatus();
+    } catch (err) {
+        document.getElementById('output').textContent = 'Error provisioning instance.';
+    }
 });
 
-down.addEventListener("click", async () => {
-  try {
-    const data = await request("/api/scale-down", { method: "POST" });
-    notice.textContent = data.message;
-    await new Promise(resolve => setTimeout(resolve, 250));
-    await refresh();
-  } catch (error) { notice.textContent = error.message; }
+document.getElementById('scale-up-btn').addEventListener('click', async () => {
+    try {
+        const currentCount = parseInt(document.getElementById('instance-count').textContent) || 1;
+        const response = await fetch('/api/scale', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ instances: currentCount + 1 })
+        });
+        const data = await response.json();
+        document.getElementById('output').textContent = data.message;
+        fetchStatus();
+    } catch (err) {
+        document.getElementById('output').textContent = 'Error scaling up.';
+    }
 });
 
-document.getElementById("refresh").addEventListener("click", refresh);
-
-document.getElementById("visit").addEventListener("click", async () => {
-  const output = document.getElementById("response");
-  output.textContent = "Sending request…";
-  try {
-    const data = await request("/api/visit");
-    output.textContent = JSON.stringify(data, null, 2);
-  } catch (error) {
-    output.textContent = error.message;
-  }
-});
-
-refresh();
-setInterval(refresh, 3000);
+// Initial fetch and polling
+fetchStatus();
+setInterval(fetchStatus, 5000);
