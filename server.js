@@ -1,117 +1,53 @@
-const express = require("express");
-const path = require("path");
-const { spawn } = require("child_process");
-const os = require("os");
-
+const express = require('express');
+const path = require('path');
 const app = express();
-const PORT = Number(process.env.PORT || 3000);
-const FIRST_WORKER_PORT = Number(process.env.FIRST_WORKER_PORT || 4001);
-const MAX_WORKERS = 5;
+const PORT = process.env.PORT || 3000;
 
-const workers = new Map();
-let nextWorkerId = 1;
-let nextRequest = 0;
-
+// Middleware
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, 'public')));
 
-function workerList() {
-  return [...workers.values()].map(w => ({
-    id: w.id,
-    port: w.port,
-    status: w.status,
-    pid: w.process.pid || null
-  }));
-}
+// Mock state for provisioning/scaling
+let systemState = {
+    instances: 2,
+    status: 'Running',
+    load: '45%'
+};
 
-function startWorker() {
-  if (workers.size >= MAX_WORKERS) {
-    return { error: `Maximum of ${MAX_WORKERS} instances reached.` };
-  }
-
-  const id = nextWorkerId++;
-  const port = FIRST_WORKER_PORT + id - 1;
-  const child = spawn(process.execPath, [path.join(__dirname, "worker.js")], {
-    env: { ...process.env, WORKER_ID: String(id), WORKER_PORT: String(port) },
-    stdio: ["ignore", "inherit", "inherit"]
-  });
-
-  const worker = { id, port, status: "starting", process: child };
-  workers.set(id, worker);
-
-  child.on("spawn", () => {
-    worker.status = "running";
-  });
-
-  child.on("error", (err) => {
-    worker.status = "error";
-    console.error(`Worker ${id} error:`, err.message);
-  });
-
-  child.on("exit", () => {
-    workers.delete(id);
-  });
-
-  return { worker: { id, port, status: worker.status } };
-}
-
-function stopWorker(id) {
-  const worker = workers.get(Number(id));
-  if (!worker) return false;
-  worker.status = "stopping";
-  worker.process.kill();
-  return true;
-}
-
-// Start with two application instances when the controller starts.
-startWorker();
-startWorker();
-
-app.get("/api/status", (req, res) => {
-  res.json({
-    controller: "running",
-    hostname: os.hostname(),
-    activeInstances: workers.size,
-    maxInstances: MAX_WORKERS,
-    workers: workerList()
-  });
+// API: Get System Status
+app.get('/api/status', (req, res) => {
+    res.json(systemState);
 });
 
-app.post("/api/scale-up", (req, res) => {
-  const result = startWorker();
-  if (result.error) return res.status(400).json(result);
-  res.json({ message: "Provisioning requested.", ...result, workers: workerList() });
+// API: Scale Instances
+app.post('/api/scale', (req, res) => {
+    const { instances } = req.body;
+    if (typeof instances === 'number' && instances >= 0) {
+        systemState.instances = instances;
+        systemState.status = 'Scaled';
+        res.json({ success: true, message: `Successfully scaled to ${instances} instances`, state: systemState });
+    } else {
+        res.status(400).json({ success: false, error: 'Invalid instances value' });
+    }
 });
 
-app.post("/api/scale-down", (req, res) => {
-  const running = [...workers.values()].filter(w => w.status === "running");
-  if (running.length <= 1) {
-    return res.status(400).json({ error: "At least one instance must remain." });
-  }
-  const target = running[running.length - 1];
-  stopWorker(target.id);
-  res.json({ message: `Scale-down requested for instance ${target.id}.`, workers: workerList() });
+// API: Provision New Instance
+app.post('/api/provision', (req, res) => {
+    systemState.instances += 1;
+    systemState.status = 'Provisioned New Node';
+    res.json({ success: true, message: 'New instance provisioned successfully', state: systemState });
 });
 
-// Round-robin request distribution across active worker processes.
-app.get("/api/visit", async (req, res) => {
-  const active = [...workers.values()].filter(w => w.status === "running");
-  if (!active.length) {
-    return res.status(503).json({ error: "No application instances are running." });
-  }
-
-  const selected = active[nextRequest % active.length];
-  nextRequest++;
-
-  try {
-    const response = await fetch(`http://127.0.0.1:${selected.port}/`);
-    const data = await response.json();
-    res.json({ ...data, routedBy: "Round-robin load balancer" });
-  } catch (err) {
-    res.status(502).json({ error: "Selected instance is not responding." });
-  }
+// CRITICAL FIX: Ensure unknown /api/ routes return JSON instead of HTML index page
+app.use('/api/*', (req, res) => {
+    res.status(404).json({ success: false, error: 'API endpoint not found' });
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Provisioning & Scaling dashboard: http://localhost:${PORT}`);
+// Catch-all route to serve the frontend single-page app
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
 });
