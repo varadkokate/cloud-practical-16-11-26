@@ -1,65 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Provisioning & Scaling Dashboard</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Provisioning & Scaling Dashboard</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="/">☁ CloudScale</a>
-    <span class="live"><i></i> Controller online</span>
-  </header>
+    <div class="container">
+        <h1>Provisioning & Scaling Control Panel</h1>
+        
+        <div class="card">
+            <h2>System Status</h2>
+            <p>Instances: <span id="instance-count">Loading...</span></p>
+            <p>Status: <span id="system-status">Loading...</span></p>
+            <p>Load: <span id="system-load">Loading...</span></p>
+        </div>
 
-  <main class="container">
-    <section class="hero">
-      <p class="eyebrow">CLOUD COMPUTING PRACTICAL</p>
-      <h1>Website Provisioning<br><span>& Scaling</span></h1>
-      <p>Provision website instances, distribute requests, and scale capacity up or down — using Node.js processes, without Docker or Kubernetes.</p>
-    </section>
+        <div class="actions">
+            <button id="provision-btn">Provision Instance</button>
+            <button id="scale-up-btn">Scale Up (+1)</button>
+        </div>
 
-    <section class="summary">
-      <article class="metric"><small>Controller status</small><strong class="green">Running</strong><span>Express server</span></article>
-      <article class="metric"><small>Active instances</small><strong id="active-count">--</strong><span>Live worker processes</span></article>
-      <article class="metric"><small>Maximum instances</small><strong>5</strong><span>Demo limit</span></article>
-    </section>
+        <div id="output"></div>
+    </div>
 
-    <section class="panel">
-      <div class="panel-head">
-        <div><p class="eyebrow">PROVISIONING CONTROL</p><h2>Manage instances</h2></div>
-        <span class="tag">Live control</span>
-      </div>
-      <p class="muted">Scale Up starts a new Node.js worker process. Scale Down stops one worker process. At least one instance remains active.</p>
-      <div class="actions">
-        <button class="btn secondary" id="down">− Scale Down</button>
-        <button class="btn primary" id="up">+ Provision / Scale Up</button>
-        <button class="btn outline" id="refresh">Refresh status</button>
-      </div>
-      <div id="workers" class="workers"></div>
-      <p id="notice" class="notice" aria-live="polite">Loading instance status…</p>
-    </section>
-
-    <section class="panel traffic">
-      <div class="panel-head">
-        <div><p class="eyebrow">LOAD BALANCING DEMO</p><h2>Test request distribution</h2></div>
-      </div>
-      <p class="muted">Send requests through the controller. It forwards each request to the next active instance using round-robin selection.</p>
-      <button class="btn primary" id="visit">Send test request</button>
-      <pre id="response">No request sent yet.</pre>
-    </section>
-
-    <section class="steps">
-      <p class="eyebrow">HOW IT WORKS</p><h2>Three simple steps</h2>
-      <div class="step-grid">
-        <article><b>01</b><h3>Provision</h3><p>Start a new Node.js worker process on an available port.</p></article>
-        <article><b>02</b><h3>Distribute</h3><p>Send incoming test requests to active workers in turn.</p></article>
-        <article><b>03</b><h3>Scale</h3><p>Add workers when needed or stop extra workers when demand falls.</p></article>
-      </div>
-    </section>
-    <p class="footnote">Educational local-process demonstration. This is not automatic cloud infrastructure provisioning; the controller and workers run on the same machine/workspace.</p>
-  </main>
-  <footer>CloudScale · Website Provisioning & Scaling Practical</footer>
-  <script src="app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
